@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Copy, Check, Loader2, Sparkles } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { Send, Bot, User, Copy, Check, Loader2, StopCircle } from 'lucide-react';
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Message } from '../types';
 import { SYSTEM_INSTRUCTION, MODEL_TEXT } from '../constants';
 
@@ -52,11 +52,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      // Construct history properly
-      const history = messages.map(m => ({
-        role: m.role,
-        parts: [{ text: m.text }]
-      }));
+      // Filter out the welcome message (id: 'welcome') from the history sent to API
+      // to ensure the conversation starts with a User message or is empty (valid for API).
+      const history = messages
+        .filter(m => m.id !== 'welcome')
+        .map(m => ({
+          role: m.role,
+          parts: [{ text: m.text }]
+        }));
 
       const chat = ai.chats.create({
         model: MODEL_TEXT,
@@ -66,24 +69,48 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
         },
       });
 
-      const response = await chat.sendMessage({ message: userMsg.text });
-      const text = response.text || "Could not generate translation.";
+      const resultStream = await chat.sendMessageStream({ message: userMsg.text });
+      
+      let fullText = '';
+      let hasAddedMessage = false;
+      const modelMsgId = (Date.now() + 1).toString();
 
-      const modelMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: text,
-        timestamp: Date.now()
-      };
+      for await (const chunk of resultStream) {
+        const c = chunk as GenerateContentResponse;
+        const text = c.text || '';
+        fullText += text;
 
-      setMessages(prev => [...prev, modelMsg]);
+        if (!hasAddedMessage) {
+          hasAddedMessage = true;
+          setMessages(prev => [...prev, {
+            id: modelMsgId,
+            role: 'model',
+            text: fullText,
+            timestamp: Date.now(),
+            isPartial: true
+          }]);
+        } else {
+          setMessages(prev => prev.map(msg => 
+            msg.id === modelMsgId 
+              ? { ...msg, text: fullText }
+              : msg
+          ));
+        }
+      }
 
-    } catch (error) {
+      // Mark as complete
+      setMessages(prev => prev.map(msg => 
+        msg.id === modelMsgId 
+          ? { ...msg, isPartial: false }
+          : msg
+      ));
+
+    } catch (error: any) {
       console.error(error);
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: "Error: Failed to connect to Gemini. Please check your API key and network connection.",
+        text: `Error: ${error.message || "Failed to connect to Gemini."}\nPlease check your API key and network connection.`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -120,7 +147,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
                       : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
                   }`}
                 >
-                  {msg.role === 'model' && (
+                  {msg.role === 'model' && !msg.isPartial && (
                     <div className="flex justify-end mb-2">
                       <button 
                         onClick={() => copyToClipboard(msg.text, msg.id)}
@@ -133,6 +160,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
                   )}
                   <span className={msg.role === 'model' ? 'font-mono text-sm' : 'text-base'}>
                      {msg.text}
+                     {msg.isPartial && <span className="inline-block w-2 h-4 ml-1 bg-indigo-400 animate-pulse align-middle" />}
                   </span>
                 </div>
                 <span className="text-xs text-slate-500 mt-1 px-1">
@@ -143,7 +171,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
             </div>
           </div>
         ))}
-        {isLoading && (
+        {isLoading && messages[messages.length - 1]?.role === 'user' && (
           <div className="flex justify-start w-full">
             <div className="flex gap-3 max-w-[70%]">
                <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
@@ -172,7 +200,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
                 }
               }}
               placeholder="Enter Japanese text..."
-              className="w-full bg-slate-800 text-white placeholder-slate-400 rounded-xl pl-4 pr-12 py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none h-[52px] scrollbar-hide"
+              disabled={isLoading}
+              className="w-full bg-slate-800 text-white placeholder-slate-400 rounded-xl pl-4 pr-12 py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none h-[52px] scrollbar-hide disabled:opacity-50"
             />
           </div>
           <button
@@ -180,7 +209,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
             disabled={!input.trim() || isLoading}
             className="p-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white transition-all shadow-lg hover:shadow-indigo-500/20"
           >
-            <Send className="w-5 h-5" />
+             <Send className="w-5 h-5" />
           </button>
         </div>
       </div>
