@@ -1,15 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Copy, Check, Loader2, StopCircle, AlertTriangle } from 'lucide-react';
+import { Send, Bot, User, Copy, Check, Loader2, AlertTriangle } from 'lucide-react';
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Message } from '../types';
 import { SYSTEM_INSTRUCTION, MODEL_TEXT } from '../constants';
 
 interface ChatInterfaceProps {
   apiKey: string;
-  onOpenSettings: () => void;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -33,8 +32,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    
+    // Prevent sending if no key is present (though UI should block this via modal)
     if (!apiKey) {
-      onOpenSettings();
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'model',
+        text: "Error: No API key found. Please configure it in Settings.",
+        timestamp: Date.now()
+      }]);
       return;
     }
 
@@ -109,24 +115,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
       console.error("Gemini API Error:", error);
       
       let errorMessage = "Failed to connect to Gemini.";
-      let technicalDetails = "";
-
       if (error instanceof Error) {
         errorMessage = error.message;
-        technicalDetails = error.stack || "";
-      } else if (typeof error === 'object') {
-         technicalDetails = JSON.stringify(error);
-         if (error.message) errorMessage = error.message;
+      } else if (typeof error === 'object' && error.message) {
+         errorMessage = error.message;
       } else {
          errorMessage = String(error);
       }
 
-      const errorDisplayText = `Error: ${errorMessage}\n\nPlease check your API key and network connection.`;
-
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: errorDisplayText,
+        text: `Error: ${errorMessage}\n\nPlease check your configuration.`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -219,13 +219,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
                 }
               }}
               placeholder="Enter Japanese text..."
-              disabled={isLoading}
+              disabled={isLoading || !apiKey}
               className="w-full bg-slate-800 text-white placeholder-slate-400 rounded-xl pl-4 pr-12 py-3 border border-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none h-[52px] scrollbar-hide disabled:opacity-50"
             />
           </div>
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !apiKey}
             className="p-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white transition-all shadow-lg hover:shadow-indigo-500/20"
           >
              <Send className="w-5 h-5" />

@@ -6,10 +6,9 @@ import { decodeAudioData, float32ToInt16, base64ToUint8Array, uint8ArrayToBase64
 
 interface LiveInterfaceProps {
   apiKey: string;
-  onOpenSettings: () => void;
 }
 
-const LiveInterface: React.FC<LiveInterfaceProps> = ({ apiKey, onOpenSettings }) => {
+const LiveInterface: React.FC<LiveInterfaceProps> = ({ apiKey }) => {
   const [isActive, setIsActive] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
@@ -64,15 +63,14 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ apiKey, onOpenSettings })
       outputContextRef.current = null;
     }
 
-    // Close Session - we can't explicitly close the session object easily if it doesn't expose close, 
-    // but stopping the stream essentially kills the flow. 
-    // The library docs say session.close() exists.
+    // Close Session properly
     if (sessionRef.current) {
-      // sessionRef.current.close(); // Check if available on the promise wrapper? 
-      // Actually we just drop the reference and let garbage collection handle it, 
-      // or rely on the `onclose` callback handling if the server kills it.
-      // But we should try to close if possible.
-      // Since ai.live.connect returns a promise that resolves to a session, we need to store the resolved session.
+      try {
+        sessionRef.current.close();
+      } catch (e) {
+        console.warn("Error closing session:", e);
+      }
+      sessionRef.current = null;
     }
     
     setIsActive(false);
@@ -81,15 +79,14 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ apiKey, onOpenSettings })
   }, []);
 
   const startSession = async () => {
-    if (!apiKey) {
-      onOpenSettings();
-      return;
-    }
-
     setStatus('connecting');
     setErrorMessage('');
 
     try {
+      if (!apiKey) {
+        throw new Error("No API key provided. Please configure it in Settings.");
+      }
+
       const ai = new GoogleGenAI({ apiKey });
       
       // Initialize Audio Contexts
@@ -280,7 +277,8 @@ const LiveInterface: React.FC<LiveInterfaceProps> = ({ apiKey, onOpenSettings })
          {status === 'idle' || status === 'error' ? (
            <button 
              onClick={startSession}
-             className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full font-semibold shadow-lg shadow-indigo-500/30 flex items-center gap-2 transition-all transform hover:scale-105"
+             disabled={!apiKey}
+             className={`px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full font-semibold shadow-lg shadow-indigo-500/30 flex items-center gap-2 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed`}
            >
              <Mic className="w-5 h-5" />
              Start Call
