@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Copy, Check, Loader2, StopCircle } from 'lucide-react';
+import { Send, Bot, User, Copy, Check, Loader2, StopCircle, AlertTriangle } from 'lucide-react';
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { Message } from '../types';
 import { SYSTEM_INSTRUCTION, MODEL_TEXT } from '../constants';
@@ -106,11 +106,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
       ));
 
     } catch (error: any) {
-      console.error(error);
+      console.error("Gemini API Error:", error);
+      
+      let errorMessage = "Failed to connect to Gemini.";
+      let technicalDetails = "";
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        technicalDetails = error.stack || "";
+      } else if (typeof error === 'object') {
+         technicalDetails = JSON.stringify(error);
+         if (error.message) errorMessage = error.message;
+      } else {
+         errorMessage = String(error);
+      }
+
+      const errorDisplayText = `Error: ${errorMessage}\n\nPlease check your API key and network connection.`;
+
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: `Error: ${error.message || "Failed to connect to Gemini."}\nPlease check your API key and network connection.`,
+        text: errorDisplayText,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMsg]);
@@ -144,10 +160,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
                   className={`p-4 rounded-2xl shadow-md whitespace-pre-wrap leading-relaxed ${
                     msg.role === 'user' 
                       ? 'bg-indigo-600 text-white rounded-tr-none' 
-                      : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
+                      : msg.text.startsWith('Error:') 
+                        ? 'bg-red-900/50 border border-red-500 text-red-100 rounded-tl-none'
+                        : 'bg-slate-800 text-slate-200 rounded-tl-none border border-slate-700'
                   }`}
                 >
-                  {msg.role === 'model' && !msg.isPartial && (
+                  {msg.role === 'model' && !msg.isPartial && !msg.text.startsWith('Error:') && (
                     <div className="flex justify-end mb-2">
                       <button 
                         onClick={() => copyToClipboard(msg.text, msg.id)}
@@ -159,6 +177,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey, onOpenSettings })
                     </div>
                   )}
                   <span className={msg.role === 'model' ? 'font-mono text-sm' : 'text-base'}>
+                     {msg.text.startsWith('Error:') && <AlertTriangle className="inline-block w-4 h-4 mr-2 mb-1" />}
                      {msg.text}
                      {msg.isPartial && <span className="inline-block w-2 h-4 ml-1 bg-indigo-400 animate-pulse align-middle" />}
                   </span>

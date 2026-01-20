@@ -16,8 +16,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, apiKey, 
   }, [apiKey]);
 
   const handleSave = () => {
-    setApiKey(inputValue);
-    localStorage.setItem('gemini_api_key', inputValue);
+    const trimmedKey = inputValue.trim();
+    setApiKey(trimmedKey);
+    localStorage.setItem('gemini_api_key', trimmedKey);
     onClose();
   };
 
