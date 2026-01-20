@@ -1,0 +1,7 @@
+{
+  "name": "JP-MM Media Translator",
+  "description": "Professional Japanese-to-Burmese subtitle translator with text and live voice capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
