@@ -1,48 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { MessageSquare, Radio, Menu, Settings } from 'lucide-react';
+import React, { useState } from 'react';
+import { MessageSquare, Radio, Menu } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import LiveInterface from './components/LiveInterface';
-import SettingsModal from './components/SettingsModal';
 import { AppMode } from './types';
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.CHAT);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Initialize API key from localStorage or fallback to env if available
-  const [apiKey, setApiKey] = useState<string>(() => {
-    return localStorage.getItem('gemini_api_key') || (process.env.API_KEY as string) || '';
-  });
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Check for API key on mount and whenever it changes
-  useEffect(() => {
-    if (!apiKey) {
-      setIsSettingsOpen(true);
-    }
-  }, [apiKey]);
+  // Initialize API key exclusively from environment variable.
+  // The application must not ask the user for the key.
+  const apiKey = process.env.API_KEY || '';
 
   const toggleMode = (newMode: AppMode) => {
     setMode(newMode);
     setIsMobileMenuOpen(false);
   };
 
-  const handleCloseSettings = () => {
-    // Only allow closing if we have a key
-    if (apiKey) {
-      setIsSettingsOpen(false);
-    }
-  };
-
   return (
     <div className="h-full flex flex-col md:flex-row bg-slate-950">
-      <SettingsModal 
-        isOpen={isSettingsOpen} 
-        onClose={handleCloseSettings}
-        apiKey={apiKey}
-        setApiKey={setApiKey}
-      />
-
       {/* Sidebar (Desktop) */}
       <div className="hidden md:flex flex-col w-64 border-r border-slate-800 bg-slate-900 p-4">
         <div className="mb-8 flex items-center gap-2 px-2">
@@ -80,16 +56,6 @@ const App: React.FC = () => {
             </span>
           </button>
         </nav>
-
-        <div className="mt-auto pt-4 border-t border-slate-800">
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
-          >
-            <Settings className="w-5 h-5" />
-            <span className="font-medium">Settings</span>
-          </button>
-        </div>
       </div>
 
       {/* Mobile Header */}
@@ -101,10 +67,10 @@ const App: React.FC = () => {
           <h1 className="text-lg font-bold text-white">JP-MM Translator</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setIsSettingsOpen(true)} className="text-white p-2">
-            <Settings className="w-6 h-6" />
-          </button>
-          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-white p-2">
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+            className="text-white p-2"
+          >
             <Menu className="w-6 h-6" />
           </button>
         </div>
