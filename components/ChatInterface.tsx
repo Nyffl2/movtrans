@@ -33,12 +33,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey }) => {
   const handleSend = async () => {
     if (!input.trim()) return;
     
-    // Prevent sending if no key is present (though UI should block this via modal)
+    // Safety check for API key
     if (!apiKey) {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: "Error: No API key found. Please configure it in Settings.",
+        text: "Error: No API key configured in environment.",
         timestamp: Date.now()
       }]);
       return;
@@ -51,6 +51,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey }) => {
       timestamp: Date.now()
     };
 
+    // Optimistically add user message
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
@@ -58,8 +59,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey }) => {
     try {
       const ai = new GoogleGenAI({ apiKey });
       
-      // Filter out the welcome message (id: 'welcome') from the history sent to API
-      // to ensure the conversation starts with a User message or is empty (valid for API).
+      // Construct history:
+      // 1. Remove the welcome message (invalid for API history usually)
+      // 2. Map strictly to { role, parts: [{ text }] }
+      // 3. IMPORTANT: Do NOT include the current `userMsg` in the history passed to `chats.create`.
+      //    The `userMsg` is passed as the argument to `sendMessageStream`.
+      //    We use the current `messages` state which does NOT yet contain `userMsg` because setState is async/closure.
       const history = messages
         .filter(m => m.id !== 'welcome')
         .map(m => ({
@@ -116,8 +121,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey }) => {
       
       let errorMessage = "Failed to connect to Gemini.";
       if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error.message) {
+        errorMessage = `${error.name}: ${error.message}`;
+      } else if (typeof error === 'object' && error?.message) {
          errorMessage = error.message;
       } else {
          errorMessage = String(error);
@@ -126,7 +131,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ apiKey }) => {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        text: `Error: ${errorMessage}\n\nPlease check your configuration.`,
+        text: `Error: ${errorMessage}\n\nPlease check your network connection and API key configuration.`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMsg]);

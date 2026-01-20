@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageSquare, Radio, Menu } from 'lucide-react';
+import { MessageSquare, Radio, Menu, AlertTriangle } from 'lucide-react';
 import ChatInterface from './components/ChatInterface';
 import LiveInterface from './components/LiveInterface';
 import { AppMode } from './types';
@@ -16,6 +16,24 @@ const App: React.FC = () => {
     setMode(newMode);
     setIsMobileMenuOpen(false);
   };
+
+  // Strict check: If no API key is present in the environment, show configuration error.
+  if (!apiKey) {
+    return (
+      <div className="h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-red-900/20 rounded-3xl border border-red-500/30 flex items-center justify-center mb-6 shadow-2xl">
+          <AlertTriangle className="w-10 h-10 text-red-500" />
+        </div>
+        <h1 className="text-3xl font-bold text-white mb-3 tracking-tight">Configuration Error</h1>
+        <p className="text-slate-400 max-w-md text-lg leading-relaxed">
+          The <code className="bg-slate-900 px-2 py-1 rounded text-slate-200 font-mono text-sm border border-slate-800">API_KEY</code> environment variable is missing.
+        </p>
+        <p className="text-slate-500 mt-4 text-sm">
+          Please configure your environment variables to use the application.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-slate-950">
